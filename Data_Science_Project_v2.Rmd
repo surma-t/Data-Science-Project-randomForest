@@ -1,0 +1,321 @@
+---
+title: "Data_Science_Project_v2"
+author: "Surma Talapatra"
+date: "May 3, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#Download packages
+library('dplyr') # data manipulation
+library('ggplot2') # Data Visualization
+library('ggthemes') # Data Visualization
+
+
+# load train.csv
+train <- read.csv('~/Desktop/Data Science Project/train.csv', stringsAsFactors = F)
+# load test.csv
+test <- read.csv('~/Desktop/Data Science Project/test.csv', stringsAsFactors = F)
+# combine them as a whole
+test$Survived <- NA
+full <- rbind(train,test)
+
+#see the data
+head(full)
+
+str(full)
+
+#Process Data 
+
+#Age Column
+
+#Check missing values
+sum(is.na(full$Age))
+
+#Replace missing Age values with a random sample of Age data
+
+age <- full$Age
+n <- length(age)
+
+set.seed(10)
+for(i in 1:n ){
+  if(is.na(age[i])){
+    age[i] <- sample(na.omit(full$Age),1)
+  }
+}
+
+#Cabin column 
+
+cabin <- full$Cabin
+n <- length(cabin)
+
+set.seed(10)
+for(i in 1:n){
+  if(nchar(cabin[i])==0){
+    cabin[i] = 0
+  } else {
+    s = strsplit(cabin[i]," ") #split string at ""
+    cabin[i] = length(s[[1]]) #number of cabin each passanger has
+  }
+}
+table(cabin)
+
+# Fare Column
+sum(is.na(full$Fare))
+
+#only 1 missing value
+
+full$PassengerId[is.na(full$Fare)]
+
+
+full[full$PassengerId==1044,]
+
+#replace Fare of 1044 by passenger who has same Pclass=3 and Embarked=S
+
+full$Fare[1044] <- median(full[full$Pclass == '3' & full$Embarked == 'S', ]$Fare, na.rm = TRUE)
+
+# Embarked column
+
+sum(is.na(full$Embarked))
+
+full$Embarked
+
+embarked <- full$Embarked
+
+table(embarked)
+
+#reassign missing embarked as "S"
+
+n <- length(embarked)
+
+for(i in 1:n){
+  if(embarked[i] != "S" && embarked[i] !="Q" && embarked[i] != "C"){
+    embarked[i] = "S"
+  }
+}
+#alt way
+for(i in 1:n){
+  if(embarked[i] == ""){
+    embarked[i] = "S"
+  }
+}
+
+table(embarked)
+
+#Data Exploration
+
+#Age vs. Survival 
+
+# number of survivals and nonsurvivals across different age
+
+
+length(train$Age) #891
+
+d <- data.frame(Age = age[1:891], Survived = train$Survived)
+ggplot(d, aes(Age,fill = factor(Survived))) +
+    geom_histogram()
+
+# create bar chart to show relationship between survival rate and age intervals
+cuts <- cut(d$Age,hist(d$Age,10,plot = F)$breaks)
+rate <- tapply(d$Survived,cuts,mean)
+d2 <- data.frame(age = names(rate),rate)
+barplot(d2$rate, xlab = "age",ylab = "survival rate")
+
+
+#Sex vs. Survival
+
+# create histgram to show effect of Sex on survival
+ggplot(train, aes(Sex,fill = factor(Survived))) +
+    geom_histogram(stat = "count")
+
+
+# calculate survival rate
+women = subset(train, Sex == "female" )
+sum(women$Survived)/nrow(women)
+
+men = subset(train, Sex == "male" )
+sum(men$Survived)/nrow(men)
+
+#easier way 
+tapply(train$Survived,train$Sex,mean)
+
+
+#Name vs Survival
+
+#Extracting title
+c = full[100,"Name"]
+s = strsplit(c,", ")
+s2 = s[[1]][2]
+title = strsplit(s2,". ")[[1]][1]
+
+n = length(full$Name)
+title = rep(NA,n)
+
+for(i in 1:n){
+  lastname = strsplit(full$Name[i],", ")[[1]][2]
+  title[i] = strsplit(lastname,". ")[[1]][1]
+}
+
+# make a histogram of title v.s survival
+d <- data.frame(title = title[1:891],Survived = train$Survived)
+ggplot(d, aes(title,fill = factor(Survived))) +
+    geom_histogram(stat = "count")
+
+# survival rate
+tapply(d$Survived,d$title,mean)
+
+table(title)
+
+
+#Pclass vs Survival
+
+# make a histogram
+ggplot(train, aes(Pclass,fill = factor(Survived))) +
+    geom_histogram(stat = "count")
+
+#survival rate
+tapply(train$Survived,train$Pclass,mean)
+
+#Family Size vs. Survival
+
+
+# histogram of Parch
+ggplot(train, aes(Parch,fill = factor(Survived))) +
+    geom_histogram(stat = "count")
+
+# histogram of SibSp
+ggplot(train, aes(SibSp,fill = factor(Survived))) +
+    geom_histogram(stat = "count")
+
+family <- full$SibSp + full$Parch
+d <- data.frame(family = family[1:891],Survived = train$Survived)
+ggplot(d, aes(family,fill = factor(Survived))) +
+    geom_histogram(stat = "count")
+
+tapply(d$Survived,d$family,mean)
+
+
+#Cabin vs. Survival
+
+# create histogram
+d <- data.frame(Cabin = cabin[1:891],Survived = train$Survived)
+ggplot(d, aes(Cabin,fill = factor(Survived))) +
+    geom_histogram(stat = "count")
+
+tapply(d$Survived,d$Cabin,mean)
+
+
+#Fare vs. Survival
+
+# make a histogram
+ggplot(train, aes(Fare,fill = factor(Survived))) +
+    geom_histogram()
+
+tapply(train$Survived,train$Fare,mean) #too big
+
+#bar chart
+cuts <- cut(train$Fare,hist(train$Fare,10,plot = F)$breaks)
+rate <- tapply(train$Survived,cuts,mean)
+d <- data.frame(fare = names(rate),rate)
+barplot(d$rate, xlab = "fare",ylab = "survival rate")
+
+
+#Embarked vs. Survival
+
+# make histogram
+d <- data.frame(Embarked = embarked[1:891], Survived = train$Survived)
+ggplot(d, aes(Embarked,fill = factor(Survived))) +
+    geom_histogram(stat = "count")
+
+tapply(train$Survived,train$Embarked,mean)
+
+```
+
+```{r}
+#Modeling 
+
+#Make training and testing set to run randomForest
+
+# response variable
+f.survived = train$Survived
+
+# feature
+# 1. age
+f.age = age[1:891]    # for training
+t.age = age[892:1309]  # for testing
+# 2. fare
+f.fare = full$Fare[1:891]
+t.fare = full$Fare[892:1309]
+# 3. cabin
+f.cabin = cabin[1:891]
+t.cabin = cabin[892:1309]
+# 4. title
+f.title = title[1:891]
+t.title = title[892:1309]
+# 5. family
+family <- full$SibSp + full$Parch
+f.family = family[1:891]
+t.family = family[892:1309]
+# 6. plcass
+f.pclass = train$Pclass
+t.pclass = test$Pclass
+# 7. sex
+f.sex = train$Sex
+t.sex = test$Sex
+# 8. embarked
+f.embarked = embarked[1:891]
+t.embarked = embarked[892:1309]
+
+# construct training data frame
+new_train = data.frame(survived = f.survived, age = f.age, fare = f.fare , sex = f.sex, 
+       embarked = f.embarked ,family = f.family ,title = f.title ,cabin =  f.cabin, pclass= f.pclass)
+
+# random forest
+install.packages("randomForest")
+library('randomForest')
+
+set.seed(123)
+fit_rf <- randomForest(factor(survived) ~ age + fare + sex + embarked + family 
+                 + title + cabin + pclass,data = new_train)
+
+    # predicted result of regression
+rf.fitted = predict(fit_rf)
+ans_rf = rep(NA,891)
+for(i in 1:891){
+  ans_rf[i] = as.integer(rf.fitted[[i]]) - 1
+}
+    # check result
+mean(ans_rf == train$Survived)
+table(ans_rf)
+
+
+
+
+# construct testing data frame
+test_data_set <- data.frame(age = t.age, fare = t.fare, sex = t.sex, embarked = t.embarked, 
+                            family = t.family, title = t.title,cabin =  t.cabin, pclass = t.pclass)
+
+
+#Prediction using randomForest
+
+set.seed(123)
+fit_rf <- randomForest(factor(survived) ~ age + fare + sex + embarked + family 
+                 + title + cabin + pclass,data = new_train)
+
+    # predicted result of regression
+rf.fitted = predict(fit_rf)
+ans_rf = rep(NA,891)
+for(i in 1:891){
+  ans_rf[i] = as.integer(rf.fitted[[i]]) - 1
+}
+    # check result
+mean(ans_rf == train$Survived)
+table(ans_rf)
+
+
+
+
+```
+
